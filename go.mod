@@ -1,4 +1,5 @@
-module github.com/pufferffish/wireproxy
+// module github.com/chkp-aviads/wireproxy
+module wireproxy
 
 go 1.21.1
 

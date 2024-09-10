@@ -3,6 +3,7 @@ package wireproxy
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -146,8 +147,10 @@ func (s *HTTPServer) serve(conn net.Conn) {
 }
 
 // ListenAndServe is used to create a listener and serve on it
-func (s *HTTPServer) ListenAndServe(network, addr string) error {
-	server, err := net.Listen(network, addr)
+func (s *HTTPServer) ListenAndServe(ctx context.Context, network, addr string) error {
+	var lc net.ListenConfig
+	// ctx, cancel := context.WithCancel(context.Background())
+	server, err := lc.Listen(ctx, network, addr)
 	if err != nil {
 		return fmt.Errorf("listen tcp failed: %w", err)
 	}

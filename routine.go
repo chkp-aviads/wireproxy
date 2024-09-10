@@ -8,10 +8,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"golang.org/x/net/icmp"
-	"golang.org/x/net/ipv4"
-	"golang.org/x/net/ipv6"
-	"golang.zx2c4.com/wireguard/device"
 	"io"
 	"log"
 	"math/rand"
@@ -22,6 +18,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/net/icmp"
+	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
+	"golang.zx2c4.com/wireguard/device"
 
 	"github.com/sourcegraph/conc"
 	"github.com/things-go/go-socks5"
@@ -49,6 +50,8 @@ type VirtualTun struct {
 	Conf      *DeviceConfig
 	// PingRecord stores the last time an IP was pinged
 	PingRecord map[string]uint64
+	Ctx        context.Context
+	Cancel     context.CancelFunc
 }
 
 // RoutineSpawner spawns a routine (e.g. socks5, tcp static routes) after the configuration is parsed
@@ -173,7 +176,7 @@ func (config *HTTPConfig) SpawnRoutine(vt *VirtualTun) {
 		server.authRequired = true
 	}
 
-	if err := server.ListenAndServe("tcp", config.BindAddress); err != nil {
+	if err := server.ListenAndServe(vt.Ctx, "tcp", config.BindAddress); err != nil {
 		log.Fatal(err)
 	}
 }
