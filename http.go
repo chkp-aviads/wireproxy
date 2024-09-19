@@ -24,6 +24,7 @@ type HTTPServer struct {
 	dial func(network, address string) (net.Conn, error)
 
 	authRequired bool
+	vtun         *VirtualTun
 }
 
 func (s *HTTPServer) authenticate(req *http.Request) (int, error) {
@@ -51,7 +52,7 @@ func (s *HTTPServer) authenticate(req *http.Request) (int, error) {
 	return http.StatusUnauthorized, fmt.Errorf("username and password not matching")
 }
 
-func (s *HTTPServer) handleConn(req *http.Request, conn net.Conn) (peer net.Conn, err error) {
+func (s *HTTPServer) handleConn(req *http.Request, conn net.Conn, ctx context.Context) (peer net.Conn, err error) {
 	addr := req.Host
 	if !strings.Contains(addr, ":") {
 		port := "443"
@@ -72,7 +73,7 @@ func (s *HTTPServer) handleConn(req *http.Request, conn net.Conn) (peer net.Conn
 	return
 }
 
-func (s *HTTPServer) handle(req *http.Request) (peer net.Conn, err error) {
+func (s *HTTPServer) handle(req *http.Request, ctx context.Context) (peer net.Conn, err error) {
 	addr := req.Host
 	if !strings.Contains(addr, ":") {
 		port := "80"
@@ -94,7 +95,7 @@ func (s *HTTPServer) handle(req *http.Request) (peer net.Conn, err error) {
 	return
 }
 
-func (s *HTTPServer) serve(conn net.Conn) {
+func (s *HTTPServer) serve(conn net.Conn, ctx context.Context) {
 	var rd = bufio.NewReader(conn)
 	req, err := http.ReadRequest(rd)
 	if err != nil {
@@ -116,9 +117,9 @@ func (s *HTTPServer) serve(conn net.Conn) {
 	var peer net.Conn
 	switch req.Method {
 	case http.MethodConnect:
-		peer, err = s.handleConn(req, conn)
+		peer, err = s.handleConn(req, conn, ctx)
 	case http.MethodGet:
-		peer, err = s.handle(req)
+		peer, err = s.handle(req, ctx)
 	default:
 		_ = responseWith(req, http.StatusMethodNotAllowed).Write(conn)
 		log.Printf("unsupported protocol: %s\n", req.Method)
@@ -163,7 +164,7 @@ func (s *HTTPServer) ListenAndServe(ctx context.Context, network, addr string) e
 			return fmt.Errorf("accept request failed: %w", err)
 		}
 		go func(conn net.Conn) {
-			s.serve(conn)
+			s.serve(conn, ctx)
 		}(conn)
 	}
 }

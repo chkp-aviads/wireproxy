@@ -1,8 +1,9 @@
 package wireproxy
 
 import (
-	"github.com/go-ini/ini"
 	"testing"
+
+	"github.com/go-ini/ini"
 )
 
 func loadIniConfig(config string) (*ini.File, error) {
@@ -13,6 +14,33 @@ func loadIniConfig(config string) (*ini.File, error) {
 	}
 
 	return ini.LoadSources(iniOpt, []byte(config))
+}
+
+func TestHarmonySASEWireguardConf(t *testing.T) {
+	const config = `
+[Interface]
+PrivateKey = uANgA6rh9cZDQLaTH9hqGTVy425OXgfmddukdHhFmHA=
+ListenPort = 8000
+
+[Peer]
+AllowedIPs = 0.0.0.0/0
+PublicKey = olcjjD50ZCemqnqn+Q9kqGAFoaDNE9sURUaXc1XAQFU=
+Endpoint = 67.55.94.85:8055
+PersistentKeepalive = 0
+
+
+[http]
+BindAddress = 127.0.0.1:52208`
+	var cfg DeviceConfig
+	iniData, err := loadIniConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = ParseInterface(iniData, &cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestWireguardConfWithoutSubnet(t *testing.T) {

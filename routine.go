@@ -171,6 +171,7 @@ func (config *HTTPConfig) SpawnRoutine(vt *VirtualTun) {
 		config: config,
 		dial:   vt.Tnet.Dial,
 		auth:   CredentialValidator{config.Username, config.Password},
+		vtun:   vt,
 	}
 	if config.Username != "" || config.Password != "" {
 		server.authRequired = true

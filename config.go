@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -175,7 +176,7 @@ func parseCIDRNetIP(section *ini.Section, keyName string) ([]netip.Addr, error) 
 		if len(str) == 0 {
 			continue
 		}
-    
+
 		if addr, err := netip.ParseAddr(str); err == nil {
 			ips = append(ips, addr)
 		} else {
@@ -183,7 +184,7 @@ func parseCIDRNetIP(section *ini.Section, keyName string) ([]netip.Addr, error) 
 			if err != nil {
 				return nil, err
 			}
-      
+
 			addr := prefix.Addr()
 			ips = append(ips, addr)
 		}
@@ -455,14 +456,29 @@ func parseRoutinesConfig(routines *[]RoutineSpawner, cfg *ini.File, sectionName 
 }
 
 // ParseConfig takes the path of a configuration file and parses it into Configuration
+func ParseConfigFromString(content string) (*Configuration, error) {
+	reader := strings.NewReader(content)
+	return ParseConfigFromReader(reader)
+}
+
 func ParseConfig(path string) (*Configuration, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	return ParseConfigFromReader(file)
+}
+
+func ParseConfigFromReader(reader io.Reader) (*Configuration, error) {
 	iniOpt := ini.LoadOptions{
 		Insensitive:            true,
 		AllowShadows:           true,
 		AllowNonUniqueSections: true,
 	}
 
-	cfg, err := ini.LoadSources(iniOpt, path)
+	cfg, err := ini.LoadSources(iniOpt, reader)
 	if err != nil {
 		return nil, err
 	}
