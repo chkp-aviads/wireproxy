@@ -65,7 +65,7 @@ func StartWireguard(conf *DeviceConfig, logger *device.Logger) (*VirtualTun, err
 		return nil, err
 	}
 
-	tun, tnet, err := netstack.CreateNetTUN(setting.DeviceAddr, setting.DNS, setting.MTU)
+	tun, tnet, err := netstack.CreateNetTUN(setting.DeviceAddr, setting.DNS, setting.MTU, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -89,5 +89,6 @@ func StartWireguard(conf *DeviceConfig, logger *device.Logger) (*VirtualTun, err
 		PingRecord: make(map[string]uint64),
 		Ctx:        ctx,
 		Cancel:     cancel,
+		logger:     logger,
 	}, nil
 }

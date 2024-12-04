@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"strings"
@@ -59,6 +58,7 @@ func (s *HTTPServer) handleConn(req *http.Request, conn net.Conn, ctx context.Co
 		addr = net.JoinHostPort(addr, port)
 	}
 
+	s.vtun.logger.Verbosef("Got HTTP Connect to %s", addr)
 	peer, err = s.dial("tcp", addr)
 	if err != nil {
 		return peer, fmt.Errorf("tun tcp dial failed: %w", err)
@@ -80,6 +80,7 @@ func (s *HTTPServer) handle(req *http.Request, ctx context.Context) (peer net.Co
 		addr = net.JoinHostPort(addr, port)
 	}
 
+	s.vtun.logger.Verbosef("Got HTTP GET to %s", addr)
 	peer, err = s.dial("tcp", addr)
 	if err != nil {
 		return peer, fmt.Errorf("tun tcp dial failed: %w", err)
@@ -99,7 +100,7 @@ func (s *HTTPServer) serve(conn net.Conn, ctx context.Context) {
 	var rd = bufio.NewReader(conn)
 	req, err := http.ReadRequest(rd)
 	if err != nil {
-		log.Printf("read request failed: %s\n", err)
+		s.vtun.logger.Errorf("read request failed: %s", err)
 		return
 	}
 
@@ -110,7 +111,7 @@ func (s *HTTPServer) serve(conn net.Conn, ctx context.Context) {
 			resp.Header.Set("Proxy-Authenticate", "Basic realm=\"Proxy\"")
 		}
 		_ = resp.Write(conn)
-		log.Println(err)
+		s.vtun.logger.Errorf("authenticate failed: %s", err)
 		return
 	}
 
@@ -122,15 +123,15 @@ func (s *HTTPServer) serve(conn net.Conn, ctx context.Context) {
 		peer, err = s.handle(req, ctx)
 	default:
 		_ = responseWith(req, http.StatusMethodNotAllowed).Write(conn)
-		log.Printf("unsupported protocol: %s\n", req.Method)
+		s.vtun.logger.Errorf("unsupported protocol: %s", req.Method)
 		return
 	}
 	if err != nil {
-		log.Printf("dial proxy failed: %s\n", err)
+		s.vtun.logger.Errorf("dial proxy failed: %s", err)
 		return
 	}
 	if peer == nil {
-		log.Println("dial proxy failed: peer nil")
+		s.vtun.logger.Errorf("dial proxy failed: peer nil")
 		return
 	}
 	go func() {
@@ -153,18 +154,52 @@ func (s *HTTPServer) ListenAndServe(ctx context.Context, network, addr string) e
 	// ctx, cancel := context.WithCancel(context.Background())
 	server, err := lc.Listen(ctx, network, addr)
 	if err != nil {
-		return fmt.Errorf("listen tcp failed: %w", err)
+		s.vtun.logger.Errorf("listen tcp failed: %w", err)
 	}
 	defer func(server net.Listener) {
 		_ = server.Close()
+		s.vtun.logger.Verbosef("Proxy server closed")
 	}(server)
-	for {
-		conn, err := server.Accept()
-		if err != nil {
-			return fmt.Errorf("accept request failed: %w", err)
+
+	connChan := make(chan net.Conn)
+	errChan := make(chan error, 1) // Make errChan buffered so it won't block
+
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				conn, err := server.Accept()
+				if err != nil {
+					select {
+					case errChan <- err:
+					case <-ctx.Done():
+					}
+					return
+				}
+				select {
+				case connChan <- conn:
+				case <-ctx.Done():
+					_ = conn.Close()
+					return
+				}
+			}
 		}
-		go func(conn net.Conn) {
-			s.serve(conn, ctx)
-		}(conn)
+	}()
+
+	for {
+		select {
+		case <-ctx.Done():
+			s.vtun.logger.Verbosef("Context cancelled, stopping server")
+			return ctx.Err()
+		case err := <-errChan:
+			s.vtun.logger.Errorf("accept request failed: %w", err)
+			return err
+		case conn := <-connChan:
+			go func(conn net.Conn) {
+				s.serve(conn, ctx)
+			}(conn)
+		}
 	}
 }
