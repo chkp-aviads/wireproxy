@@ -17,6 +17,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/net/icmp"
@@ -50,6 +51,7 @@ type VirtualTun struct {
 	Conf      *DeviceConfig
 	// PingRecord stores the last time an IP was pinged
 	PingRecord map[string]uint64
+	PingRecordLock *sync.Mutex
 	Ctx        context.Context
 	Cancel     context.CancelFunc
 	logger     *device.Logger
@@ -481,7 +483,9 @@ func (d VirtualTun) pingIPs() {
 				}
 			}
 
+			d.PingRecordLock.Lock()
 			d.PingRecord[addr.String()] = uint64(time.Now().Unix())
+			d.PingRecordLock.Unlock()
 
 			defer socket.Close()
 		}()

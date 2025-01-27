@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
+
 	"net/netip"
 
 	"github.com/MakeNowJust/heredoc/v2"
@@ -87,6 +89,7 @@ func StartWireguard(conf *DeviceConfig, logger *device.Logger) (*VirtualTun, err
 		Conf:       conf,
 		SystemDNS:  len(setting.DNS) == 0,
 		PingRecord: make(map[string]uint64),
+		PingRecordLock: new(sync.Mutex),
 		Ctx:        ctx,
 		Cancel:     cancel,
 		logger:     logger,
