@@ -245,8 +245,9 @@ func main() {
 	}
 
 	lock("ready")
+	var errorLogger = device.NewLogger(logLevel, "wireproxy")
 
-	tun, err := wireproxy.StartWireguard(conf.Device, logLevel)
+	tun, err := wireproxy.StartWireguard(conf.Device, errorLogger)
 	if err != nil {
 		log.Fatal(err)
 	}
