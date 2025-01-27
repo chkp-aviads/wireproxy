@@ -83,15 +83,18 @@ func StartWireguard(conf *DeviceConfig, logger *device.Logger) (*VirtualTun, err
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	pingCtx, pingCancel := context.WithCancel(context.Background())
 	return &VirtualTun{
-		Tnet:       tnet,
-		Dev:        dev,
-		Conf:       conf,
-		SystemDNS:  len(setting.DNS) == 0,
-		PingRecord: make(map[string]uint64),
+		Tnet:           tnet,
+		Dev:            dev,
+		Conf:           conf,
+		SystemDNS:      len(setting.DNS) == 0,
+		PingRecord:     make(map[string]uint64),
 		PingRecordLock: new(sync.Mutex),
-		Ctx:        ctx,
-		Cancel:     cancel,
-		logger:     logger,
+		Ctx:            ctx,
+		Cancel:         cancel,
+		PingCtx:        pingCtx,
+		PingCancel:     pingCancel,
+		logger:         logger,
 	}, nil
 }

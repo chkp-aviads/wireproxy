@@ -50,11 +50,13 @@ type VirtualTun struct {
 	SystemDNS bool
 	Conf      *DeviceConfig
 	// PingRecord stores the last time an IP was pinged
-	PingRecord map[string]uint64
+	PingRecord     map[string]uint64
 	PingRecordLock *sync.Mutex
-	Ctx        context.Context
-	Cancel     context.CancelFunc
-	logger     *device.Logger
+	Ctx            context.Context
+	Cancel         context.CancelFunc
+	PingCtx        context.Context
+	PingCancel     context.CancelFunc
+	logger         *device.Logger
 }
 
 // RoutineSpawner spawns a routine (e.g. socks5, tcp static routes) after the configuration is parsed
@@ -492,15 +494,35 @@ func (d VirtualTun) pingIPs() {
 	}
 }
 
-func (d VirtualTun) StartPingIPs() {
+func (d *VirtualTun) StartPingIPs() {
+	// Cancel the previous context if it exists
+	if d.PingCancel != nil {
+		d.PingCancel()
+	}
+
+	// Create a new context and cancel function
+	d.PingCtx, d.PingCancel = context.WithCancel(context.Background())
+
+	// Initialize the ping record
 	for _, addr := range d.Conf.CheckAlive {
 		d.PingRecord[addr.String()] = 0
 	}
 
+	// Start the pinging goroutine
 	go func() {
+		ticker := time.NewTicker(time.Duration(d.Conf.CheckAliveInterval) * time.Second)
+		defer ticker.Stop()
 		for {
-			d.pingIPs()
-			time.Sleep(time.Duration(d.Conf.CheckAliveInterval) * time.Second)
+			select {
+			case <-d.PingCtx.Done():
+				return
+			case <-ticker.C:
+				d.pingIPs()
+			}
 		}
 	}()
+}
+
+func (d *VirtualTun) StopPingIPs() {
+	d.PingCancel()
 }
