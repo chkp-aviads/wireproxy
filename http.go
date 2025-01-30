@@ -144,6 +144,13 @@ func (s *HTTPServer) serve(conn net.Conn, ctx context.Context) {
 			_, err = io.Copy(peer, conn)
 			_ = peer.Close()
 		})
+		wg.Go(func() {
+			select {
+			case <-ctx.Done():
+				_ = conn.Close()
+				_ = peer.Close()
+			}
+		})
 		wg.Wait()
 	}()
 }
