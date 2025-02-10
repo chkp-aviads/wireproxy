@@ -25,7 +25,6 @@ import (
 	"golang.org/x/net/ipv6"
 	"golang.zx2c4.com/wireguard/device"
 
-	"github.com/sourcegraph/conc"
 	"github.com/things-go/go-socks5"
 	"github.com/things-go/go-socks5/bufferpool"
 
@@ -198,6 +197,9 @@ func (c CredentialValidator) Valid(username, password string) bool {
 
 // connForward copy data from `from` to `to`
 func connForward(from io.ReadWriteCloser, to io.ReadWriteCloser, logger *device.Logger) {
+	defer from.Close()
+	defer to.Close()
+
 	_, err := io.Copy(to, from)
 	if err != nil {
 		logger.Errorf("Cannot forward traffic: %s\n", err.Error())
@@ -220,20 +222,8 @@ func tcpClientForward(vt *VirtualTun, raddr *addressPort, conn net.Conn) {
 		return
 	}
 
-	go func() {
-		wg := conc.NewWaitGroup()
-		wg.Go(func() {
-			connForward(sconn, conn, vt.logger)
-		})
-		wg.Go(func() {
-			connForward(conn, sconn, vt.logger)
-		})
-		wg.Wait()
-		_ = sconn.Close()
-		_ = conn.Close()
-		sconn = nil
-		conn = nil
-	}()
+	go connForward(sconn, conn, vt.logger)
+	go connForward(conn, sconn, vt.logger)
 }
 
 // STDIOTcpForward starts a new connection via wireguard and forward traffic from `conn`
@@ -258,18 +248,8 @@ func STDIOTcpForward(vt *VirtualTun, raddr *addressPort) {
 		return
 	}
 
-	go func() {
-		wg := conc.NewWaitGroup()
-		wg.Go(func() {
-			connForward(os.Stdin, sconn, vt.logger)
-		})
-		wg.Go(func() {
-			connForward(sconn, stdout, vt.logger)
-		})
-		wg.Wait()
-		_ = sconn.Close()
-		sconn = nil
-	}()
+	go connForward(os.Stdin, sconn, vt.logger)
+	go connForward(sconn, stdout, vt.logger)
 }
 
 // SpawnRoutine spawns a local TCP server which acts as a proxy to the specified target
@@ -319,20 +299,9 @@ func tcpServerForward(vt *VirtualTun, raddr *addressPort, conn net.Conn) {
 		return
 	}
 
-	go func() {
-		gr := conc.NewWaitGroup()
-		gr.Go(func() {
-			connForward(sconn, conn, vt.logger)
-		})
-		gr.Go(func() {
-			connForward(conn, sconn, vt.logger)
-		})
-		gr.Wait()
-		_ = sconn.Close()
-		_ = conn.Close()
-		sconn = nil
-		conn = nil
-	}()
+	go connForward(sconn, conn, vt.logger)
+	go connForward(conn, sconn, vt.logger)
+
 }
 
 // SpawnRoutine spawns a TCP server on wireguard which acts as a proxy to the specified target

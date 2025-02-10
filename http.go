@@ -10,8 +10,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-
-	"github.com/sourcegraph/conc"
 )
 
 const proxyAuthHeaderKey = "Proxy-Authorization"
@@ -33,7 +31,7 @@ func (s *HTTPServer) authenticate(req *http.Request) (int, error) {
 
 	auth := req.Header.Get(proxyAuthHeaderKey)
 	if auth == "" {
-		return http.StatusProxyAuthRequired, fmt.Errorf(http.StatusText(http.StatusProxyAuthRequired))
+		return http.StatusProxyAuthRequired, fmt.Errorf("%s", http.StatusText(http.StatusProxyAuthRequired))
 	}
 
 	enc := strings.TrimPrefix(auth, "Basic ")
@@ -134,24 +132,27 @@ func (s *HTTPServer) serve(conn net.Conn, ctx context.Context) {
 		s.vtun.logger.Errorf("dial proxy failed: peer nil")
 		return
 	}
+
 	go func() {
-		wg := conc.NewWaitGroup()
-		wg.Go(func() {
-			_, err = io.Copy(conn, peer)
+		defer conn.Close()
+		defer peer.Close()
+
+		_, _ = io.Copy(conn, peer)
+	}()
+
+	go func() {
+		defer conn.Close()
+		defer peer.Close()
+
+		_, _ = io.Copy(peer, conn)
+	}()
+
+	go func() {
+		select {
+		case <-ctx.Done():
 			_ = conn.Close()
-		})
-		wg.Go(func() {
-			_, err = io.Copy(peer, conn)
 			_ = peer.Close()
-		})
-		wg.Go(func() {
-			select {
-			case <-ctx.Done():
-				_ = conn.Close()
-				_ = peer.Close()
-			}
-		})
-		wg.Wait()
+		}
 	}()
 }
 
