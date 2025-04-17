@@ -26,6 +26,13 @@ anything.
 Users who want something similar but for Amnezia VPN can use [this fork](https://github.com/artem-russkikh/wireproxy-awg)
 of wireproxy by [@artem-russkikh](https://github.com/artem-russkikh).
 
+# Sponsor
+
+This project is supported by [IPRoyal](https://iproyal.com/?r=795836). You can get premium quality proxies at unbeatable prices
+with a discount using [this referral link](https://iproyal.com/?r=795836)! 🚀
+
+![IPRoyal](/assets/iproyal.png)
+
 # Feature
 
 - TCP static routing for client and server
