@@ -161,6 +161,7 @@ func (config *Socks5Config) SpawnRoutine(vt *VirtualTun) {
 		socks5.WithResolver(vt),
 		socks5.WithAuthMethods(authMethods),
 		socks5.WithBufferPool(bufferpool.NewPool(256 * 1024)),
+		socks5.WithLogger(*vt.logger),
 	}
 
 	server := socks5.NewServer(options...)
